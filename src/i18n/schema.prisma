@@ -1,0 +1,180 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model ApiKey {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  key        String           @unique
+  permission ApiKeyPermission @default(READ_ONLY)
+
+  // Relations
+  projectId Int
+  project   Project @relation(fields: [projectId], references: [id])
+
+  @@map("api_key")
+}
+
+model I18nKey {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  name String
+
+  // Relations
+  children        I18nKey[]     @relation("key_hierarchy")
+  i18nNamespaceId Int
+  i18nNamespace   I18nNamespace @relation(fields: [i18nNamespaceId], references: [id])
+  i18nValues      I18nValue[]
+  parentId        Int?
+  parent          I18nKey?      @relation("key_hierarchy", fields: [parentId], references: [id])
+
+  @@unique([i18nNamespaceId, name, parentId])
+  @@map("i18n_keys")
+}
+
+model I18nNamespace {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  name String
+
+  // Relations
+  i18nkeys  I18nKey[]
+  projectId Int
+  project   Project   @relation(fields: [projectId], references: [id])
+
+  @@unique([projectId, name])
+  @@map("i18n_namespace")
+}
+
+model I18nValue {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  value String
+
+  // Relations
+  i18nKeyId Int
+  i18nKey   I18nKey @relation(fields: [i18nKeyId], references: [id])
+  localeId  Int
+  locale    Locale  @relation(fields: [localeId], references: [id])
+
+  @@unique([i18nKeyId, localeId])
+  @@map("value")
+}
+
+model Locale {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  code String @unique
+  name String
+
+  // Relations
+  i18nValues     I18nValue[]
+  projectLocales ProjectLocale[]
+
+  @@map("locale")
+}
+
+model Project {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  description String?
+  name        String
+
+  // Relations
+  apiKeys        ApiKey[]
+  i18nNamespaces I18nNamespace[]
+  projectUsers   ProjectUser[]
+  projectLocales ProjectLocale[]
+
+  @@map("project")
+}
+
+model ProjectLocale {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  localeId  Int
+  locale    Locale  @relation(fields: [localeId], references: [id])
+  projectId Int
+  project   Project @relation(fields: [projectId], references: [id])
+
+  @@unique([projectId, localeId])
+  @@map("project_locale")
+}
+
+model ProjectUser {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  role ProjectUserRole @default(USER)
+
+  // Relations
+  projectId Int
+  project   Project @relation(fields: [projectId], references: [id])
+  userId    Int
+  user      User    @relation(fields: [userId], references: [id])
+
+  @@unique([projectId, userId])
+  @@map("project_user")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  authProvider AuthProvider @map("auth_provider")
+  displayName  String       @map("display_name")
+  email        String?
+  imageUrl     String?      @map("image_url")
+  refId        String       @unique @map("ref_id")
+  role         UserRole     @default(USER) @map("role")
+
+  // Relations
+  projectUsers ProjectUser[]
+
+  @@map("user")
+}
+
+enum ApiKeyPermission {
+  READ_ONLY
+  READ_WRITE
+}
+
+enum AuthProvider {
+  GOOGLE
+  DISCORD
+  GITHUB
+}
+
+enum ProjectUserRole {
+  OWNER
+  USER
+  VIEWER
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  USER
+}
