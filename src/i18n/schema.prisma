@@ -65,28 +65,13 @@ model I18nValue {
   value String
 
   // Relations
-  i18nKeyId Int
-  i18nKey   I18nKey @relation(fields: [i18nKeyId], references: [id])
-  localeId  Int
-  locale    Locale  @relation(fields: [localeId], references: [id])
+  i18nKeyId         Int
+  i18nKey           I18nKey         @relation(fields: [i18nKeyId], references: [id])
+  projectLanguageId Int
+  projectLanguage   ProjectLanguage @relation(fields: [projectLanguageId], references: [id])
 
-  @@unique([i18nKeyId, localeId])
+  @@unique([i18nKeyId, projectLanguageId])
   @@map("value")
-}
-
-model Locale {
-  id        Int      @id @default(autoincrement())
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  code String @unique
-  name String
-
-  // Relations
-  i18nValues     I18nValue[]
-  projectLocales ProjectLocale[]
-
-  @@map("locale")
 }
 
 model Project {
@@ -98,27 +83,28 @@ model Project {
   name        String
 
   // Relations
-  apiKeys        ApiKey[]
-  i18nNamespaces I18nNamespace[]
-  projectUsers   ProjectUser[]
-  projectLocales ProjectLocale[]
+  apiKeys          ApiKey[]
+  i18nNamespaces   I18nNamespace[]
+  projectUsers     ProjectUser[]
+  projectLanguages ProjectLanguage[]
 
   @@map("project")
 }
 
-model ProjectLocale {
+model ProjectLanguage {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  // Relations
-  localeId  Int
-  locale    Locale  @relation(fields: [localeId], references: [id])
-  projectId Int
-  project   Project @relation(fields: [projectId], references: [id])
+  code String
 
-  @@unique([projectId, localeId])
-  @@map("project_locale")
+  // Relations
+  projectId  Int
+  project    Project     @relation(fields: [projectId], references: [id])
+  i18nValues I18nValue[]
+
+  @@unique([projectId, code])
+  @@map("project_language")
 }
 
 model ProjectUser {
