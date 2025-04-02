@@ -30,14 +30,11 @@ model I18nKey {
   name String
 
   // Relations
-  children        I18nKey[]     @relation("key_hierarchy")
   i18nNamespaceId Int
   i18nNamespace   I18nNamespace @relation(fields: [i18nNamespaceId], references: [id])
   i18nValues      I18nValue[]
-  parentId        Int?
-  parent          I18nKey?      @relation("key_hierarchy", fields: [parentId], references: [id])
 
-  @@unique([i18nNamespaceId, name, parentId])
+  @@unique([i18nNamespaceId, name])
   @@map("i18n_keys")
 }
 
@@ -49,9 +46,12 @@ model I18nNamespace {
   name String
 
   // Relations
+  children  I18nNamespace[] @relation("hierarchy")
   i18nkeys  I18nKey[]
   projectId Int
-  project   Project   @relation(fields: [projectId], references: [id])
+  project   Project         @relation(fields: [projectId], references: [id])
+  parentId  Int?
+  parent    I18nNamespace?  @relation("hierarchy", fields: [parentId], references: [id])
 
   @@unique([projectId, name])
   @@map("i18n_namespace")
