@@ -16,8 +16,8 @@ model ApiKey {
   permission ApiKeyPermission @default(READ_ONLY)
 
   // Relations
-  projectId Int
-  project   Project @relation(fields: [projectId], references: [id])
+  projectVersionId Int            @map("project_version_id")
+  projectVersion   ProjectVersion @relation(fields: [projectVersionId], references: [id], onDelete: Cascade)
 
   @@map("api_key")
 }
@@ -30,12 +30,12 @@ model I18nKey {
   name String
 
   // Relations
-  i18nNamespaceId Int
-  i18nNamespace   I18nNamespace @relation(fields: [i18nNamespaceId], references: [id])
+  i18nNamespaceId Int           @map("i18n_namespace_id")
+  i18nNamespace   I18nNamespace @relation(fields: [i18nNamespaceId], references: [id], onDelete: Cascade)
   i18nValues      I18nValue[]
 
   @@unique([i18nNamespaceId, name])
-  @@map("i18n_keys")
+  @@map("i18n_key")
 }
 
 model I18nNamespace {
@@ -46,14 +46,14 @@ model I18nNamespace {
   name String
 
   // Relations
-  children  I18nNamespace[] @relation("hierarchy")
-  i18nkeys  I18nKey[]
-  projectId Int
-  project   Project         @relation(fields: [projectId], references: [id])
-  parentId  Int?
-  parent    I18nNamespace?  @relation("hierarchy", fields: [parentId], references: [id])
+  children         I18nNamespace[] @relation("hierarchy")
+  i18nkeys         I18nKey[]
+  projectVersionId Int             @map("project_version_id")
+  projectVersion   ProjectVersion  @relation(fields: [projectVersionId], references: [id], onDelete: Cascade)
+  parentId         Int?            @map("parent_id")
+  parent           I18nNamespace?  @relation("hierarchy", fields: [parentId], references: [id], onDelete: Cascade)
 
-  @@unique([projectId, name])
+  @@unique([projectVersionId, name])
   @@map("i18n_namespace")
 }
 
@@ -65,13 +65,13 @@ model I18nValue {
   value String
 
   // Relations
-  i18nKeyId         Int
-  i18nKey           I18nKey         @relation(fields: [i18nKeyId], references: [id])
-  projectLanguageId Int
-  projectLanguage   ProjectLanguage @relation(fields: [projectLanguageId], references: [id])
+  i18nKeyId         Int             @map("i18n_key_id")
+  i18nKey           I18nKey         @relation(fields: [i18nKeyId], references: [id], onDelete: Cascade)
+  projectLanguageId Int             @map("project_language_id")
+  projectLanguage   ProjectLanguage @relation(fields: [projectLanguageId], references: [id], onDelete: Cascade)
 
   @@unique([i18nKeyId, projectLanguageId])
-  @@map("value")
+  @@map("i18n_value")
 }
 
 model Project {
@@ -83,12 +83,28 @@ model Project {
   name        String
 
   // Relations
-  apiKeys          ApiKey[]
-  i18nNamespaces   I18nNamespace[]
-  projectUsers     ProjectUser[]
-  projectLanguages ProjectLanguage[]
+  projectUsers            ProjectUser[]
+  projectVersions         ProjectVersion[]
+  currentProjectVersionId Int?             @map("current_project_version_id")
+  currentProjectVersion   ProjectVersion?  @relation("current_project_version", fields: [currentProjectVersionId], references: [id], onDelete: SetNull)
+  projectHistories        ProjectHistory[]
 
   @@map("project")
+}
+
+model ProjectHistory {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  details Json
+  kind    ProjectHistoryKind
+
+  // Relations
+  projectId Int     @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("project_history")
 }
 
 model ProjectLanguage {
@@ -98,13 +114,15 @@ model ProjectLanguage {
 
   code     String
   isSource Boolean @default(false) @map("is_source")
+  position Int     @default(0)
 
   // Relations
-  projectId  Int
-  project    Project     @relation(fields: [projectId], references: [id])
-  i18nValues I18nValue[]
+  projectVersionId Int            @map("project_version_id")
+  projectVersion   ProjectVersion @relation(fields: [projectVersionId], references: [id], onDelete: Cascade)
+  i18nValues       I18nValue[]
 
-  @@unique([projectId, code])
+  @@unique([projectVersionId, code])
+  @@unique([projectVersionId, position])
   @@map("project_language")
 }
 
@@ -116,13 +134,48 @@ model ProjectUser {
   role ProjectUserRole @default(USER)
 
   // Relations
-  projectId Int
-  project   Project @relation(fields: [projectId], references: [id])
-  userId    Int
-  user      User    @relation(fields: [userId], references: [id])
+  projectId Int     @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    Int     @map("user_id")
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, userId])
   @@map("project_user")
+}
+
+model ProjectVersion {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  description String?
+  version     Int     @default(1)
+
+  // Relations
+  apiKeys                 ApiKey[]
+  currentProject          Project[]               @relation("current_project_version")
+  i18nNamespaces          I18nNamespace[]
+  projectId               Int                     @map("project_id")
+  project                 Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectLanguages        ProjectLanguage[]
+  projectVersionHistories ProjectVersionHistory[]
+
+  @@map("project_version")
+}
+
+model ProjectVersionHistory {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  details Json
+  kind    ProjectVersionHistoryKind
+
+  // Relations
+  projectVersionId Int            @map("project_version_id")
+  projectVersion   ProjectVersion @relation(fields: [projectVersionId], references: [id], onDelete: Cascade)
+
+  @@map("project_version_history")
 }
 
 model User {
@@ -130,12 +183,12 @@ model User {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  authProvider AuthProvider @map("auth_provider")
-  displayName  String       @map("display_name")
-  email        String?
-  imageUrl     String?      @map("image_url")
-  refId        String       @unique @map("ref_id")
-  role         UserRole     @default(USER) @map("role")
+  provider    AuthProvider
+  displayName String       @map("display_name")
+  email       String?
+  imageUrl    String?      @map("image_url")
+  refId       String       @unique @map("ref_id")
+  role        UserRole     @default(USER)
 
   // Relations
   projectUsers ProjectUser[]
@@ -154,10 +207,34 @@ enum AuthProvider {
   GITHUB
 }
 
+enum ProjectHistoryKind {
+  ADD_USER
+  CREATE
+  CREATE_VERSION
+  DROP_USER
+  UPDATE_NAME
+  UPDATE_DESCRIPTION
+  UPDATE_CURRENT_VERSION
+  UPDATE_USER_ROLE
+}
+
 enum ProjectUserRole {
   OWNER
   USER
   VIEWER
+}
+
+enum ProjectVersionHistoryKind {
+  ADD_LANGUAGE
+  CREATE
+  CREATE_API_KEY
+  DELETE_API_KEY
+  DELETE_LANGUAGE
+  REGENERATE_API_KEY
+  UPDATE_API_KEY_PERMISSION
+  UPDATE_LANGUAGE_CODE
+  UPDATE_LANGUAGE_POSITION
+  UPDATE_SOURCE_LANGUAGE
 }
 
 enum UserRole {
